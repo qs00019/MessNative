@@ -1,0 +1,13 @@
+//需要注释，否则提示install task不能添加，与上传bintray冲突
+apply plugin: 'maven'
+group = POM_GROUP
+version = POM_VERSION
+archivesBaseName = POM_ARTIFACTID
+
+uploadArchives {
+    println "${rootDir}//local.properties"
+    repositories.mavenDeployer {
+        repository(url: POM_LOCAL_URL)
+
+    }
+}
