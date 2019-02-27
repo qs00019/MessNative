@@ -51,3 +51,7 @@ proguardFiles 'proguard-android.txt', 'proguard-rules.pro'
 
 ## 注意
 在C中替换java方法名时，groovy返回的methodSignature是java语法，C里动态注册用的是smali语法。当前版本未做方法签名判断，所以有方法重写是，替换回出错。
+
+## Sample示例
+示例工程混淆后反编译，SoTest类的方法被混淆
+![示例图片](https://github.com/qs00019/MessNative/blob/master/pic.jpg)
