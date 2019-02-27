@@ -43,5 +43,5 @@ buildscript {
     }
 }
 
-//apply from: '../bintray_groovy.gradle'
-apply from: '../maven_localserver.gradle'
+apply from: '../bintray_groovy.gradle'
+//apply from: '../maven_localserver.gradle'

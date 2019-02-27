@@ -5,7 +5,7 @@ Android JNI接口混淆方案。以下文章描述了java暴露jni接口的问�
 https://www.jianshu.com/p/0350cb715934
 https://www.jianshu.com/p/676861ca29fd
 
-本项目参考了Mess，对native方法进行了混淆，然后改变RegisterNatives注册java的方法字符串为混淆后的字符串，达到混淆native方法的目的。实现原理见
+本项目参考了Mess，对java与native交互的类和方法进行了混淆，然后改变RegisterNatives注册java的方法字符串为混淆后的字符串，达到混淆native方法的目的。实现原理见
 https://www.jianshu.com/p/799e5bc62633
 
 
@@ -15,7 +15,7 @@ https://www.jianshu.com/p/799e5bc62633
 
 dependencies {
         classpath 'com.android.tools.build:gradle:3.3.0'
-        classpath 'com.github.qs00019:messnative:1.0.1'
+        classpath 'com.github.qs00019:messnative:1.0.2'
    }
     
 apply plugin: 'com.android.application'
@@ -23,8 +23,12 @@ apply plugin: 'com.github.qs00019.messnative'
 
 //java类名和C中动态注册的文件名	
 messnative {
-    map = ["com.github.qs00019.messnative.TestSo":"src/main/cpp/native-lib.cpp"]
+    //匹配混淆的类
+    classAndNativesMap = [["com.github.qs00019.messnative.TestSo","src/main/cpp/native-lib.cpp"]]
+    //匹配混淆类的方法
+    classAllMethodAndNatives  = [["com.github.qs00019.messnative.TestSo","src/main/cpp/native-lib.cpp"]]
 }
+
 ```
 
 复制android SDK下proguard目录下的proguard-android.txt到当前目录，需要注释native方法的默认混淆
@@ -40,12 +44,6 @@ proguardFiles getDefaultProguardFile('proguard-android.txt'),  'proguard-rules.p
 ```
 ```
 proguardFiles 'proguard-android.txt', 'proguard-rules.pro'
-```
-
-需要防止TestSo被混淆，proguard增加
-
-```
--keep class com.github.qs00019.messnative.TestSo
 ```
 
 
