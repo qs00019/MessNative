@@ -24,28 +24,36 @@ class RewriteNativeTask extends DefaultTask {
     @Input
     MessExtension messExt
 
+
     @TaskAction
     void rewrite() {
         println "messnative start rewrite task"
-        Map matchMap = messExt.map;
-        if(matchMap == null || matchMap.size() == 0){
-            println "messnative config map wrong"
-            return
-        }
-        String[] nativeNames = new String[matchMap.size()];
-        String[] classNames = new String[matchMap.size()];
-        matchMap.eachWithIndex { Map.Entry<Object, Object> entry, int i ->
-            classNames[i] = entry.getKey()
-            nativeNames[i] = entry.getValue()
-        }
+        //类名与C文件替换列表，直接替换类名，例如替换在src/main/cpp/so.cpp里的com.test.So对应的com/test/So替换为a/b/c
+        List<List<String>> classAndNativesMap = messExt.classAndNativesMap;
+        //类名与C文件替换列表，替换方法名，例如替换在src/main/cpp/so.cpp里的test()为a()
+        List<List<String>> classAllMethodAndNatives = messExt.classAllMethodAndNatives;
 
-        List<String> classList = Arrays.asList(classNames);
-        Map<String, Map<String,String>> map = new LinkedHashMap<String,LinkedHashMap<String,String>>();
+        //获取类名和c文件数组，下标一致，便于游标定位和判断是否包含元素
+        def (List classNames1, List nativeNames1) = getArray(classAndNativesMap)
+        def (List classNames2, List nativeNames2) = getArray(classAllMethodAndNatives)
+
+        //保存混淆前的类名和混淆后的类名
+        Map classMap1 = new LinkedHashMap<String,String>();
+        //保存混淆前的类名，对应的方法列表和混淆后的方法列表
+        Map<String, Map<String,String>> classMap2 = new LinkedHashMap<String,LinkedHashMap<String,String>>();
+
         MappingReader reader = new MappingReader(apkVariant.mappingFile)
         reader.pump(new MappingProcessor() {
             @Override
             boolean processClassMapping(String className, String newClassName) {
-                return classList.contains(className)
+                //如果类名需要混淆，则未加入情况下，加入到map中
+                if(classNames1.contains(className)){
+                    if(!classMap1.containsKey(className)){
+                        classMap1.put(className, newClassName);
+                    }
+                }
+                //返回true，这个类的处理才能进入processMethodMapping
+                return classNames2.contains(className)
             }
 
             @Override
@@ -55,26 +63,70 @@ class RewriteNativeTask extends DefaultTask {
 
             @Override
             void processMethodMapping(String className, int firstLineNumber, int lastLineNumber, String methodReturnType, String methodName, String methodArguments, String newClassName, int newFirstLineNumber, int newLastLineNumber, String newMethodName) {
-                if(!map.containsKey(className)){
-                    map.put(className, new LinkedHashMap<String,String>())
+                //如果类名的方法需要混淆，将混淆前和混淆后的方法加入map
+                if(!classMap2.containsKey(className)){
+                    classMap2.put(className, new LinkedHashMap<String,String>())
                 }
-                map.get(className).put( methodName , methodArguments + ";" + newMethodName);
+                classMap2.get(className).put( methodName , methodArguments + ";" + newMethodName);
             }
         })
-
-        if(map.size() != 0) {
-            classNames.eachWithIndex { String className, int i ->
-                Map<String,String> map1 = map.get(className);
-                String nativeName = nativeNames[i]
+        //标识是否进行了处理，因为有两项任务
+        boolean flag = false;
+        //保存被备份过的文件，如果前一项任务已经备份过，则不再备份
+        List<String> fileList = new ArrayList<>()
+        if(classMap1.size() != 0) {
+            flag = true;
+            nativeNames1.eachWithIndex { String nativeName, int i ->
+                //nativeName对应的className，找到这个class里需要替换的方法map
+                String className = classNames1.get(i)
+                String value = classMap1.get(className);
                 //println "writeLine className:" + className + ";nativeName:" + nativeName
 
+                //String nativePath = copyNativeFile(nativeName, fileList)
                 String nativePath = "${project.projectDir.absolutePath}/" + nativeName
-                String bacupNativePath = nativePath + "~"
-                //println("nativePath:" + nativePath)
-                new File(bacupNativePath).delete()
-                new File(nativePath).renameTo(new File(bacupNativePath))
-                copyFile(bacupNativePath, nativePath)
+                if(!fileList.contains(nativeName)){
+                    fileList.add(nativeName)
+                    String bacupNativePath = nativePath + "~"
+                    //println("nativePath:" + nativePath)
+                    new File(bacupNativePath).delete()
+                    new File(nativePath).renameTo(new File(bacupNativePath))
+                    copyFile(bacupNativePath, nativePath)
+                }
 
+                //替换文本，注意在C里面是以/为分割符
+                File f = new File(nativePath)
+                String text = f.text;
+                String oldStr = className.replace(".","/")
+                String newStr = value.replace(".","/")
+                //if (line.contains("\"${oldStr}\"") && line.contains("\"${methodArgument}\"")) {
+                if (text.contains("\"${oldStr}\"")) {
+                    text = text.replace("\"${oldStr}\"", "\"${newStr}\"")
+                    println("messnative replace oldStr:${oldStr},newStr:${newStr}")
+                }
+                f.delete()
+                f.withWriter(CHARSET) { writer ->
+                    writer.write(text)
+                }
+            }
+        }
+
+        if(classMap2.size() != 0) {
+            flag = true;
+            nativeNames2.eachWithIndex { String nativeName, int i ->
+                //nativeName对应的className，找到这个class里需要替换的方法map
+                String className = classNames2.get(i)
+                Map<String,String> map1 = classMap2.get(className);
+                //println "writeLine className:" + className + ";nativeName:" + nativeName
+                //String nativePath = copyNativeFile(nativeName, fileList)
+                String nativePath = "${project.projectDir.absolutePath}/" + nativeName
+                if(!fileList.contains(nativeName)){
+                    fileList.add(nativeName)
+                    String bacupNativePath = nativePath + "~"
+                    //println("nativePath:" + nativePath)
+                    new File(bacupNativePath).delete()
+                    new File(nativePath).renameTo(new File(bacupNativePath))
+                    copyFile(bacupNativePath, nativePath)
+                }
                 File f = new File(nativePath)
                 String text = f.text;
                 map1.each { k, v ->
@@ -85,6 +137,7 @@ class RewriteNativeTask extends DefaultTask {
                     //if (line.contains("\"${oldStr}\"") && line.contains("\"${methodArgument}\"")) {
                     if (text.contains("\"${oldStr}\"")) {
                         text = text.replace("\"${oldStr}\"", "\"${newStr}\"")
+                        println("messnative replace oldStr:${oldStr},newStr:${newStr}")
                     }
 
                 }
@@ -92,9 +145,10 @@ class RewriteNativeTask extends DefaultTask {
                 f.withWriter(CHARSET) { writer ->
                     writer.write(text)
                 }
-
-
             }
+        }
+        //如果进入过两项任务之一，需需要重新编译C，且还原备份的文件
+        if(flag){
 
             String taskName = "externalNativeBuild${apkVariant.name.capitalize()}"
             def externalNativeBuildTask = project.tasks.findByName(taskName)
@@ -108,17 +162,39 @@ class RewriteNativeTask extends DefaultTask {
             }
             externalNativeBuildTask.execute()
 
-            nativeNames.each {nativeName ->
-                //println "nativeNames.each nativeName:" + nativeName
+            fileList.each { nativeName ->
+                //println "nativeNames2.each nativeName:" + nativeName
                 String nativePath = "${project.projectDir.absolutePath}/" + nativeName
                 String bacupNativePath = nativePath + "~"
-                //println "nativeNames.each nativePath:" + nativePath
+                //println "nativeNames2.each nativePath:" + nativePath
                 new File(nativePath).delete()
                 new File(bacupNativePath).renameTo(new File(nativePath))
             }
-
         }
         println "messnative end rewrite task"
+    }
+
+    private GString copyNativeFile(String nativeName, List<String> fileList) {
+        String nativePath = "${project.projectDir.absolutePath}/" + nativeName
+        if(!list.contains(nativeName)){
+            list.add(nativeName)
+            String bacupNativePath = nativePath + "~"
+            //println("nativePath:" + nativePath)
+            new File(bacupNativePath).delete()
+            new File(nativePath).renameTo(new File(bacupNativePath))
+            copyFile(bacupNativePath, nativePath)
+        }
+        nativePath
+    }
+
+    private List getArray(List<List<String>> classAndNativesMap) {
+        List classNames = new ArrayList<String>();
+        List nativeNames = new ArrayList<String>();
+        classAndNativesMap.eachWithIndex { List<String> entry, int i ->
+            classNames.add(entry.get(0))
+            nativeNames.add(entry.get(1))
+        }
+        [classNames, nativeNames]
     }
 
     public static void copyFile(sourcePath, destationPath) {

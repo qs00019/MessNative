@@ -21,4 +21,4 @@
 -verbose
 -optimizations !code/simplification/arithmetic,!field/*,!class/merging/* #优化配置
 -ignorewarnings #忽略警告
--keep class com.github.qs00019.messnative.TestSo
+#-keep class com.github.qs00019.messnative.TestSo

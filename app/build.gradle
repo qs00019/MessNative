@@ -48,5 +48,6 @@ dependencies {
 }
 
 messnative {
-    map = ["com.github.qs00019.messnative.TestSo":"src/main/cpp/native-lib.cpp"]
+    classAndNativesMap = [["com.github.qs00019.messnative.TestSo","src/main/cpp/native-lib.cpp"]]
+    classAllMethodAndNatives  = [["com.github.qs00019.messnative.TestSo","src/main/cpp/native-lib.cpp"]]
 }
