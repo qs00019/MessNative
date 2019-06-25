@@ -78,9 +78,9 @@ class RewriteNativeTask extends DefaultTask {
             flag = true;
             nativeNames1.eachWithIndex { String nativeName, int i ->
                 //nativeName对应的className，找到这个class里需要替换的方法map
-                String className = classNames1.get(i)
-                String value = classMap1.get(className);
-                //println "writeLine className:" + className + ";nativeName:" + nativeName
+                String oldClassName = classNames1.get(i)
+                String newClassName = classMap1.get(oldClassName);
+                //println "writeLine oldClassName:" + oldClassName + ";nativeName:" + nativeName
 
                 //String nativePath = copyNativeFile(nativeName, fileList)
                 String nativePath = "${project.projectDir.absolutePath}/" + nativeName
@@ -96,8 +96,8 @@ class RewriteNativeTask extends DefaultTask {
                 //替换文本，注意在C里面是以/为分割符
                 File f = new File(nativePath)
                 String text = f.text;
-                String oldStr = className.replace(".","/")
-                String newStr = value.replace(".","/")
+                String oldStr = oldClassName.replace(".","/")
+                String newStr = newClassName.replace(".","/")
                 //if (line.contains("\"${oldStr}\"") && line.contains("\"${methodArgument}\"")) {
                 if (text.contains("\"${oldStr}\"")) {
                     text = text.replace("\"${oldStr}\"", "\"${newStr}\"")
@@ -106,6 +106,8 @@ class RewriteNativeTask extends DefaultTask {
                 f.delete()
                 f.withWriter(CHARSET) { writer ->
                     writer.write(text)
+                    writer.flush()
+                    writer.close()
                 }
             }
         }
@@ -116,7 +118,7 @@ class RewriteNativeTask extends DefaultTask {
                 //nativeName对应的className，找到这个class里需要替换的方法map
                 String className = classNames2.get(i)
                 Map<String,String> map1 = classMap2.get(className);
-                //println "writeLine className:" + className + ";nativeName:" + nativeName
+                //println "writeLine oldClassName:" + oldClassName + ";nativeName:" + nativeName
                 //String nativePath = copyNativeFile(nativeName, fileList)
                 String nativePath = "${project.projectDir.absolutePath}/" + nativeName
                 if(!fileList.contains(nativeName)){
@@ -144,6 +146,8 @@ class RewriteNativeTask extends DefaultTask {
                 f.delete()
                 f.withWriter(CHARSET) { writer ->
                     writer.write(text)
+                    writer.flush()
+                    writer.close()
                 }
             }
         }
